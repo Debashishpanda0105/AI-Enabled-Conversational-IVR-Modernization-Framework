@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>IRCTC IVR Simulator</title>
+</head>
+<body style="font-family:Arial; text-align:center; margin-top:60px;">
+
+<h2>📞 IRCTC IVR Web Simulator</h2>
+
+<div id="display" style="border:1px solid #ccc; padding:20px; height:150px; overflow:auto;">
+Press Start Call to begin.
+</div>
+
+<br>
+
+<button onclick="startCall()">Start Call</button>
+<button onclick="endCall()">Hang Up</button>
+
+<br><br>
+
+<div>
+<button onclick="press('1')">1</button>
+<button onclick="press('2')">2</button>
+<button onclick="press('0')">0</button>
+</div>
+
+<script>
+
+const API_URL = "http://localhost:8000";
+
+let sessionId = null;
+let currentMenu = null;
+let callActive = false;
+
+function display(text) {
+    const box = document.getElementById("display");
+    box.innerHTML += "<p>" + text + "</p>";
+    box.scrollTop = box.scrollHeight;
+}
+
+async function startCall() {
+    if (callActive) return;
+
+    const response = await fetch(`${API_URL}/ivr/start`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({caller_number: "Web User"})
+    });
+
+    const data = await response.json();
+
+    sessionId = data.session_id;
+    currentMenu = data.menu;
+    callActive = true;
+
+    display("🔊 " + data.prompt);
+}
+
+async function press(digit) {
+    if (!callActive) return;
+
+    display("You pressed: " + digit);
+
+    const response = await fetch(`${API_URL}/ivr/input`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            session_id: sessionId,
+            digit: digit,
+            current_menu: currentMenu
+        })
+    });
+
+    const data = await response.json();
+
+    if (data.prompt) {
+        currentMenu = data.menu || currentMenu;
+        display("🔊 " + data.prompt);
+    }
+
+    if (data.action === "hangup") {
+        display("🔊 " + data.message);
+        endCall();
+    }
+}
+
+function endCall() {
+    callActive = false;
+    sessionId = null;
+    currentMenu = null;
+    display("📵 Call ended.");
+}
+
+</script>
+
+</body>
+</html>
